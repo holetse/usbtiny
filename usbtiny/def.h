@@ -35,7 +35,13 @@
 #else
 #  define USB_INT_CONFIG	MCUCR
 #endif
+
+#if (defined __AVR_ATtiny861__ || defined __AVR_ATtiny461__ || defined __AVR_ATtiny261__) && USBTINY_INT < 2
+#define	USB_INT_CONFIG_SET	((1 << CAT3(ISC,0,1)) | (1 << CAT3(ISC,0,0)))
+#else
 #define	USB_INT_CONFIG_SET	((1 << CAT3(ISC,USBTINY_INT,1)) | (1 << CAT3(ISC,USBTINY_INT,0)))
+#endif
+
 #if	defined SIG_INT0
 #  define USB_INT_VECTOR	CAT2(SIG_INT, USBTINY_INT)
 #else

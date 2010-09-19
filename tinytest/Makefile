@@ -1,5 +1,5 @@
 # ======================================================================
-# USBtiny global Makefile
+# Template Makefile
 #
 # Copyright 2006-2010 Dick Streefland
 #
@@ -7,7 +7,13 @@
 # Public License as published by the Free Software Foundation.
 # ======================================================================
 
-DIR	= spi ir usbtinyisp template util tinytest tinytest-861 keyboard-spoof
+USBTINY		= ../usbtiny
+TARGET_ARCH	= -mmcu=attiny2313
+OBJECTS		= main.o
+FLASH_CMD	= avrdude -pt2313 -U flash:w:main.hex
+FUSES_CMD	= avrdude -pt2313 -U hfuse:w:0xdb:m -U lfuse:w:0xef:m
+STACK		= 32
+FLASH		= 2048
+SRAM		= 128
 
-all clean clobber:
-	@for i in $(DIR); do $(MAKE) $(MFLAGS) -C $$i $@; done
+include $(USBTINY)/common.mk

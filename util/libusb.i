@@ -23,9 +23,7 @@ static	void	check_status ( int status )
 	}
 }
 
-static	void	usb_control_in ( usb_dev_handle* dev, int requesttype,
-                                 int request, int value, int index,
-                                 char* inbuf, int* psize, int timeout )
+static	void	usb_control_in ( usb_dev_handle * dev, int requesttype, int request, int value, int index, char * inbuf, int * psize, int timeout )
 {
 	int	r;
 
@@ -37,7 +35,7 @@ static	void	usb_control_in ( usb_dev_handle* dev, int requesttype,
 	*psize = r;
 }
 
-static	int	usb_control_out ( usb_dev_handle* dev, int requesttype,
+static	int	usb_control_out ( usb_dev_handle * dev, int requesttype,
                                   int request, int value, int index,
                                   char* outbuf, int bufsize, int timeout )
 {
@@ -70,14 +68,10 @@ static	void	usb_string ( usb_dev_handle* dev, int index, char* strbuf )
 %include cstring.i
 
 %cstring_output_withsize( char* inbuf, int* psize );
-static	void	usb_control_in ( usb_dev_handle *dev, int requesttype,
-				 int request, int value, int index,
-				 char* inbuf, int* psize, int timeout );
+static	void	usb_control_in ( usb_dev_handle *dev, int requesttype, int request, int value, int index, char* inbuf, int* psize, int timeout );
 
 %cstring_input_binary( char* outbuf, int bufsize )
-static	int	usb_control_out ( usb_dev_handle *dev, int requesttype,
-				  int request, int value, int index,
-				  char* outbuf, int bufsize, int timeout );
+static	int	usb_control_out ( usb_dev_handle *dev, int requesttype, int request, int value, int index, char* outbuf, int bufsize, int timeout );
 
 %cstring_bounded_output( char* strbuf, 255 );
 static	void	usb_string ( usb_dev_handle* dev, int index, char* strbuf );

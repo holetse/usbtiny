@@ -57,6 +57,8 @@ byte_t	usb_rx_token;			// PID of token packet: SETUP or OUT
 
 byte_t	usb_tx_buf[USB_BUFSIZE];	// output buffer
 byte_t	usb_tx_len;			// output buffer size, 0 means empty
+byte_t	usb_tx1_buf[USB_BUFSIZE];	// endpoint 1 output buffer
+byte_t	usb_tx1_len;			// endpoint 1 output buffer size, 0 means empty
 
 byte_t	usb_address;			// assigned device address
 byte_t	usb_new_address;		// new device address
@@ -137,12 +139,16 @@ static	byte_t	string_langid [] PROGMEM =
 };
 #endif
 
+#if USBTINY_INTERFACE_CLASS == 0x03
+	extern byte_t report_desc [USBTINY_HID_REPORT_DESCRIPTOR_LENGTH] PROGMEM;
+#endif
+
 // Device Descriptor
 static	byte_t	descr_device [18] PROGMEM =
 {
 	18,				// bLength
 	DESCRIPTOR_TYPE_DEVICE,		// bDescriptorType
-	LE(0x0101),			// bcdUSB
+	LE(0x0110),			// bcdUSB
 	USBTINY_DEVICE_CLASS,		// bDeviceClass
 	USBTINY_DEVICE_SUBCLASS,	// bDeviceSubClass
 	USBTINY_DEVICE_PROTOCOL,	// bDeviceProtocol
@@ -161,7 +167,7 @@ static	byte_t	descr_config [] PROGMEM =
 {
 	9,				// bLength
 	DESCRIPTOR_TYPE_CONFIGURATION,	// bDescriptorType
-	LE(9+9+7*USBTINY_ENDPOINT),	// wTotalLength
+	LE(9+9+(7*USBTINY_ENDPOINT)+(9*(USBTINY_INTERFACE_CLASS == 0x03))),	// wTotalLength
 	1,				// bNumInterfaces
 	1,				// bConfigurationValue
 	0,				// iConfiguration
@@ -178,6 +184,15 @@ static	byte_t	descr_config [] PROGMEM =
 	USBTINY_INTERFACE_SUBCLASS,	// bInterfaceSubClass
 	USBTINY_INTERFACE_PROTOCOL,	// bInterfaceProtocol
 	0,				// iInterface
+#if USBTINY_INTERFACE_CLASS == 0x03 // HID Class
+	9, // bLength
+	0x21, // bDescriptorType (HID)
+	0x11, 0x01, // bcdHID
+	USBTINY_HID_COUNTRY_CODE, // bCountryCode
+	0x01, // bNumDescriptors
+	0x22, // bDescriptorType (Report)
+	sizeof(report_desc), 0x00, // wDescriptorLength
+#endif
 
 #if	USBTINY_ENDPOINT
 	// Additional Endpoint
@@ -241,6 +256,13 @@ static	void	usb_receive ( byte_t* data, byte_t rx_len )
 					data = (byte_t*) &descr_config;
 					len = sizeof(descr_config);
 				}
+#if USBTINY_INTERFACE_CLASS == 0x03 // HID
+				else if ( data[3] == 0x22 ) // HID Report
+				{
+					data = (byte_t*) &report_desc;
+					len = sizeof(report_desc);
+				}
+#endif
 #if	VENDOR_NAME_ID || DEVICE_NAME_ID || SERIAL_ID
 				else if	( data[3] == 3 )
 				{	// STRING
@@ -419,3 +441,44 @@ extern	void	usb_poll ( void )
 #endif
 	}
 }
+
+#if USBTINY_ENDPOINT && USBTINY_ENDPOINT_ADDRESS == 0x81
+
+// ----------------------------------------------------------------------
+// Load the Endpoint #1 IN buffer (optional):
+// - check for incoming USB packets
+// - refill an empty transmit buffer
+// - check for USB bus reset
+// ----------------------------------------------------------------------
+extern	byte_t	usb_load_endp1(byte_t* data, byte_t len)
+{
+	static byte_t initd = 0;
+	int i;
+	
+	// We use a length of zero to lock the buffer while we write to it
+	cli();
+	usb_tx1_len = 0;
+	sei();
+	
+	if (!initd) {
+		usb_tx1_buf[0] = USB_PID_DATA0;
+		initd = 1;
+	} else {
+		usb_tx1_buf[0] ^= (USB_PID_DATA0 ^ USB_PID_DATA1);
+	}
+	
+	for(i = 0; (i < len) && (i < USB_BUFSIZE); ++i) {
+		usb_tx1_buf[i + 1] = data[i];
+	}
+	
+	crc( usb_tx1_buf + 1, i );
+	
+	// Write the actual length set to unlock the buffer and enabled TX
+	cli();
+	usb_tx1_len = i + 3;
+	sei();
+	
+	return i;
+}
+
+#endif

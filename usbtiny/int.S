@@ -38,6 +38,15 @@
 ;
 ; Copyright 2006-2010 Dick Streefland
 ;
+;
+;
+; Modified by Edward Holets, 2010.
+; Added support for a single additional end point at the cost of 8
+; cycles at the end of the interrupt handler. This brings the total
+; free cycles between interrupts to 20. Not including the I-bit caveat
+; mentioned by Dick Streefland above.
+;
+;
 ; This is free software, licensed under the terms of the GNU General
 ; Public License as published by the Free Software Foundation.
 ; ======================================================================
@@ -72,6 +81,11 @@ tx_nak:	.byte	USB_PID_NAK		; NAK packet
 #define	pid		odd
 #define	addr		usbmask
 #define	tmp		fixup
+
+; ADDED - Edward Holets 9/9/2010
+#define tmp2	even
+; END ADDED
+
 
 #define	nop2		rjmp	.+0	// not .+2 for some strange reason
 
@@ -308,8 +322,14 @@ eop2:
 	sbrc	pid, 1
 	rjmp	is_data_handshake	; jump for Data or Handshake packet
 	; check ADDR of Token packet (SE0+13)
-	ldd	addr, Y+1
+; REMOVED - Edward Holets 9/9/2010
+;	ldd	addr, Y+1
+;	andi	addr, 0x7f
+; ADDED - Edward Holets 9/9/2010 - we use one cycle here
+	ldd	tmp2, Y+1
+	mov addr, tmp2
 	andi	addr, 0x7f
+; END ADDED
 	lds	tmp, usb_address
 	cp	addr, tmp		; is this packet for me?
 	brne	ignore			; no, ignore
@@ -320,6 +340,28 @@ eop2:
 ; ----------------------------------------------------------------------
 ; Handle IN (SE0+22)
 ; ----------------------------------------------------------------------
+
+; ADDED - Edward Holets 9/9/2010
+; we have 4 cycles - 3 used here, 1 used above
+	bst tmp2, 7 		; grab LSB of ENDP and place in T - 1 cycle
+	brbc 6, endpoint0	; branch if the endpoint is #0 - 1/2 cycles
+	nop					; keep endpoint1 call path in sync with endpoint0 - 1 cycle
+; endpoint 1
+	lds	count, usb_tx1_len
+	tst	count			; data ready?
+	breq	nak			; no, reply with NAK
+	lds	tmp, usb_rx_len
+	tst	tmp			; unprocessed input packet?
+	brne	nak			; yes, don't send old data for new packet
+	sts	usb_tx1_len, tmp		; buffer is available again (after reti)
+
+	ldi	YL, lo8(usb_tx1_buf)
+	ldi	YH, hi8(usb_tx1_buf)
+	rjmp	send_packet		; SE0+40, SE0 --> SOP <= 51
+
+endpoint0:
+
+; END ADDED
 	lds	count, usb_tx_len
 	tst	count			; data ready?
 	breq	nak			; no, reply with NAK
@@ -327,8 +369,11 @@ eop2:
 	tst	tmp			; unprocessed input packet?
 	brne	nak			; yes, don't send old data for new packet
 	sts	usb_tx_len, tmp		; buffer is available again (after reti)
-	lds	tmp, usb_new_address
-	sts	usb_address, tmp	; assign new address at end of transfer
+
+; REMOVED - Edward Holets 9/8/2010 ; moved to end of gen_eop
+;	lds	tmp, usb_new_address
+;	sts	usb_address, tmp	; assign new address at end of transfer
+
 	ldi	YL, lo8(usb_tx_buf)
 	ldi	YH, hi8(usb_tx_buf)
 	rjmp	send_packet		; SE0+40, SE0 --> SOP <= 51
@@ -560,4 +605,12 @@ gen_eop:
 	out	USB_OUT, count		; disable D- pullup
 	pop	usbmask
 	pop	count
+
+; ADDED - Edward Holets 9/8/2010 ; code moved from above
+	push tmp
+	lds	tmp, usb_new_address
+	sts	usb_address, tmp	; assign new address at end of transfer
+	pop tmp
+; END ADD	
+	
 	reti

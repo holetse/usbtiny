@@ -25,4 +25,6 @@ extern	byte_t		usb_setup ( byte_t data[8] );
 extern	void		usb_out ( byte_t* data, byte_t len );
 extern	byte_t		usb_in ( byte_t* data, byte_t len );
 
+extern	byte_t		usb_load_endp1(byte_t* data, byte_t len);
+
 #endif	// USB_H

@@ -18,6 +18,6 @@ clobber:	clean
 	rm -f _libusb.so libusb.py
 
 _libusb.so:	libusb.i
-	swig -python -D'__attribute__(x)=' -w302,454 -I/usr/include $<
-	gcc -s -shared -fPIC -I$(PYTHONINC) -o _libusb.so libusb_wrap.c -lusb
+	swig -python -D'__attribute__(x)=' -w302,454 -I/usr/include -I/opt/local/include/ $<
+	gcc -bundle -fPIC -I$(PYTHONINC) -I/opt/local/include/ -o _libusb.so libusb_wrap.c -lpython -L/opt/local/lib/ -lusb
 	@rm -f libusb_wrap.c
