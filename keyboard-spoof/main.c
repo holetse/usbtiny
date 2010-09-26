@@ -65,9 +65,14 @@ typedef long spoof_delay_t;
 typedef struct {
   spoof_delay_t delay; // how long to hold these keys down for
   byte_t keys[8]; // the keys
-} spoof_entry;
+} spoof_event_entry;
 
-static spoof_entry spoof_desc[] PROGMEM = {
+typedef struct {
+	const spoof_event_entry * events;
+	unsigned int length;
+} spoof;
+
+static spoof_event_entry hello_world_spoof[] PROGMEM = {
 	{ 25, {0x02, 0x0, 0x0B, 0x0, 0x0, 0x0, 0x0, 0x0} },
 	{ 25, {0x0, 0x0, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0} },
 	{ 25, {0x0, 0x0, 0x0F, 0x0, 0x0, 0x0, 0x0, 0x0} },
@@ -81,11 +86,17 @@ static spoof_entry spoof_desc[] PROGMEM = {
 	{ 25, {0x0, 0x0, 0x0F, 0x0, 0x0, 0x0, 0x0, 0x0} },
 	{ 25, {0x0, 0x0, 0x07, 0x0, 0x0, 0x0, 0x0, 0x0} },
 	{ 5000, {0x0, 0x0, 0x00, 0x0, 0x0, 0x0, 0x0, 0x0} },
+	{ -1, {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0} }
+};
+
+static spoof spoofs[] PROGMEM = {
+	{hello_world_spoof, sizeof(hello_world_spoof) / sizeof(spoof_event_entry)}
 };
 
 
 spoof_delay_t spoof_delay = SPOOF_INIT_DELAY;
 unsigned int spoof_index = 0;
+unsigned int spoofs_index = 0;
 
 
 // ----------------------------------------------------------------------
@@ -196,19 +207,38 @@ void key_report_poll( void ) {
 void spoofer_poll( void ) {
 	int i;
 	byte_t *src;
-	if(ms_counter >= spoof_delay && spoof_delay != -1) // loop forever on -1
+	unsigned int spoof_length;
+	const spoof * spoof_desc;
+	const spoof_event_entry * spoof_events;
+	
+	
+	if(ms_counter >= spoof_delay && spoof_delay != -2) // loop forever on -2
 	{
-		src = (byte_t *) spoof_desc[spoof_index].keys;
-		for(i = 0; i < sizeof(keys); ++i) {
-			keys[i] = pgm_read_byte(src);
-			src++;
-		}
-		spoof_delay = pgm_read_dword((&spoof_desc[spoof_index]) + offsetof(spoof_entry, delay));
-		ms_counter = 0;
-		keys_changed = 1;
-		spoof_index++;
-		if (spoof_index >= sizeof(spoof_desc) / sizeof(spoof_entry)) {
+		spoof_desc = &spoofs[spoofs_index];
+		spoof_events = (const spoof_event_entry *)pgm_read_word(spoof_desc + offsetof(spoof, events));
+		spoof_length = pgm_read_word(((byte_t *) spoof_desc) + offsetof(spoof, length));
+		spoof_delay = pgm_read_dword(&(spoof_events[spoof_index].delay));
+		// should we skip to a new spoof description?
+		if (spoof_delay == -1) { // yes
+			spoof_delay = 1000; // random here!
+			ms_counter = 0;
 			spoof_index = 0;
+			spoofs_index++; // random here!
+			if (spoofs_index >= sizeof(spoofs) / sizeof(spoof)) {
+				spoofs_index = 0;
+			}
+		} else { // no
+			src = (byte_t *) spoof_events[spoof_index].keys;
+			for(i = 0; i < sizeof(keys); ++i) {
+				keys[i] = pgm_read_byte(src);
+				src++;
+			}
+			ms_counter = 0;
+			keys_changed = 1;
+			spoof_index++;
+			if (spoof_index >= spoof_length) {
+				spoof_index = 0;
+			}
 		}
 	}
 }
