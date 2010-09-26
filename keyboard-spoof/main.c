@@ -234,13 +234,13 @@ void key_report_poll( void ) {
 
 void spoof_fetch( void ) {
 	spoof_desc = &spoofs[spoofs_index];
-	spoof_events = (const spoof_event_entry *)pgm_read_word(((byte_t *) spoof_desc) + offsetof(spoof, events));
-	spoof_length = pgm_read_word(((byte_t *) spoof_desc) + offsetof(spoof, length));
+	spoof_events = (const spoof_event_entry *)pgm_read_word(((const byte_t *) spoof_desc) + offsetof(spoof, events));
+	spoof_length = pgm_read_word(((const byte_t *) spoof_desc) + offsetof(spoof, length));
 }
 
 void spoofer_poll( void ) {
 	int i;
-	byte_t *src;
+	const byte_t *src;
 	
 	
 	if(ms_counter >= spoof_delay && spoof_delay != -2) // loop forever on -2
@@ -257,7 +257,7 @@ void spoofer_poll( void ) {
 			}
 			spoof_fetch();
 		} else { // no
-			src = (byte_t *) spoof_events[spoof_index].keys;
+			src = spoof_events[spoof_index].keys;
 			for(i = 0; i < sizeof(keys); ++i) {
 				keys[i] = pgm_read_byte(src);
 				src++;
