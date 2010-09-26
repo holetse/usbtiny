@@ -122,6 +122,9 @@ static spoof spoofs[] PROGMEM = {
 spoof_delay_t spoof_delay = SPOOF_INIT_DELAY;
 unsigned int spoof_index = 0;
 unsigned int spoofs_index = 0;
+unsigned int spoof_length = 0;
+const spoof * spoof_desc = 0;
+const spoof_event_entry * spoof_events = 0;
 
 
 // ----------------------------------------------------------------------
@@ -229,19 +232,19 @@ void key_report_poll( void ) {
 	}
 }
 
+void spoof_fetch( void ) {
+	spoof_desc = &spoofs[spoofs_index];
+	spoof_events = (const spoof_event_entry *)pgm_read_word(((byte_t *) spoof_desc) + offsetof(spoof, events));
+	spoof_length = pgm_read_word(((byte_t *) spoof_desc) + offsetof(spoof, length));
+}
+
 void spoofer_poll( void ) {
 	int i;
 	byte_t *src;
-	unsigned int spoof_length;
-	const spoof * spoof_desc;
-	const spoof_event_entry * spoof_events;
 	
 	
 	if(ms_counter >= spoof_delay && spoof_delay != -2) // loop forever on -2
 	{
-		spoof_desc = &spoofs[spoofs_index];
-		spoof_events = (const spoof_event_entry *)pgm_read_word(((byte_t *) spoof_desc) + offsetof(spoof, events));
-		spoof_length = pgm_read_word(((byte_t *) spoof_desc) + offsetof(spoof, length));
 		spoof_delay = pgm_read_dword(&(spoof_events[spoof_index].delay));
 		// should we skip to a new spoof description?
 		if (spoof_delay == -1) { // yes
@@ -252,6 +255,7 @@ void spoofer_poll( void ) {
 			if (spoofs_index >= sizeof(spoofs) / sizeof(spoof)) {
 				spoofs_index = 0;
 			}
+			spoof_fetch();
 		} else { // no
 			src = (byte_t *) spoof_events[spoof_index].keys;
 			for(i = 0; i < sizeof(keys); ++i) {
@@ -268,6 +272,10 @@ void spoofer_poll( void ) {
 	}
 }
 
+void spoof_init( void ) {
+	spoof_fetch();
+}
+
 
 // ----------------------------------------------------------------------
 // Main
@@ -277,6 +285,7 @@ extern	int	main ( void )
 	PORT_SET(A, 1);
 	DDR_SET(A, 0);
 	usb_init();
+	spoof_init();
 	timer0_init();
 	for	( ;; )
 	{
