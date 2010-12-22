@@ -1,0 +1,18 @@
+# Time keeping pill container
+
+## Features
+
+	* Day of week and am/pm display
+	* LED illuminated (4 bit PWM -- 14 channels)
+	* USB controlled
+	* Self powered (2xAA?) & bus powered
+	* 0.6mA avg power consumption when self powered
+	* 10mA avg power consumption when bus powered
+
+## Hardware
+	
+	* ATTiny861 @ 12MHz
+	* RTC - M41T81
+	* PMOS based power source selection
+	* MAX756
+	

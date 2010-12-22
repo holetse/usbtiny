@@ -26,5 +26,9 @@ extern	void		usb_out ( byte_t* data, byte_t len );
 extern	byte_t		usb_in ( byte_t* data, byte_t len );
 
 extern	byte_t		usb_load_endp1(byte_t* data, byte_t len);
+extern	byte_t		usb_connected();
+extern	byte_t		usb_idle();
+void 				usb_disable_pulldown();
+void 				usb_enable_pulldown();
 
 #endif	// USB_H

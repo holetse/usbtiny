@@ -79,6 +79,10 @@ static	byte_t	usb_tx_state;		// TX_STATE_*, see enum above
 static	byte_t	usb_tx_total;		// total transmit size
 static	byte_t*	usb_tx_data;		// pointer to data to transmit
 
+#if USBTINY_USB_STATUS_API
+static byte_t is_connected = 0;
+#endif
+
 #if	defined USBTINY_VENDOR_NAME
 struct
 {
@@ -242,6 +246,9 @@ static	void	usb_receive ( byte_t* data, byte_t rx_len )
 #ifdef	USBTINY_USB_OK_LED
 				SET(USBTINY_USB_OK_LED);// LED on
 #endif
+#if USBTINY_USB_STATUS_API
+				is_connected = 1;
+#endif
 			}
 			else if	( data[1] == 6 )	// GET_DESCRIPTOR
 			{
@@ -399,9 +406,23 @@ extern	void	usb_init ( void )
 #ifdef	USBTINY_USB_OK_LED
 	OUTPUT(USBTINY_USB_OK_LED);
 #endif
+#ifdef USBTINY_USB_VBUS_SENSE
+	INPUT(USBTINY_USB_VBUS_SENSE);	// enable the Vbus-sense pin
+	CLR(USBTINY_USB_VBUS_SENSE);
+#endif
 #ifdef	USBTINY_DMINUS_PULLUP
-	SET(USBTINY_DMINUS_PULLUP);
-	OUTPUT(USBTINY_DMINUS_PULLUP);	// enable pullup on D-
+	#ifdef USBTINY_USB_VBUS_SENSE
+		if (TST(USBTINY_USB_VBUS_SENSE)) {
+			SET(USBTINY_DMINUS_PULLUP);
+			OUTPUT(USBTINY_DMINUS_PULLUP);	// enable pullup on D-
+		} else {
+			INPUT(USBTINY_DMINUS_PULLUP);	// disable pullup on D-
+			CLR(USBTINY_DMINUS_PULLUP);
+		}
+	#else
+		SET(USBTINY_DMINUS_PULLUP);
+		OUTPUT(USBTINY_DMINUS_PULLUP);	// enable pullup on D-
+	#endif
 #endif
 	sei();
 }
@@ -415,6 +436,9 @@ extern	void	usb_init ( void )
 extern	void	usb_poll ( void )
 {
 	byte_t	i;
+#ifdef USBTINY_USB_VBUS_SENSE
+	static byte_t is_attached = 0;
+#endif
 
 	// check for incoming USB packets
 	if	( usb_rx_len != 0 )
@@ -428,16 +452,46 @@ extern	void	usb_poll ( void )
 	{
 		usb_transmit();
 	}
+	
+	// check for detach event
+#ifdef USBTINY_USB_VBUS_SENSE
+		i = TST(USBTINY_USB_VBUS_SENSE);
+		if (is_attached && !i) {
+			is_attached = 0;
+			usb_new_address = 0;
+			usb_address = 0;
+	#ifdef	USBTINY_USB_OK_LED
+			CLR(USBTINY_USB_OK_LED);	// LED off
+	#endif
+	#if USBTINY_USB_STATUS_API
+			is_connected = 0;
+	#endif
+	#ifdef	USBTINY_DMINUS_PULLUP
+			INPUT(USBTINY_DMINUS_PULLUP);	// disable pullup on D-
+			CLR(USBTINY_DMINUS_PULLUP);
+	#endif
+		} else if (!is_attached && i == 1) {
+			is_attached = i;
+	#ifdef	USBTINY_DMINUS_PULLUP
+			SET(USBTINY_DMINUS_PULLUP);
+			OUTPUT(USBTINY_DMINUS_PULLUP);	// enable pullup on D-
+	#endif
+		}
+#endif
+	
 	// check for USB bus reset
 	for	( i = 10; i > 0 && ! (USB_IN & USB_MASK_DMINUS); i-- )
 	{
 	}
-	if	( i == 0 )
+	if ( i == 0 )
 	{	// SE0 for more than 2.5uS is a reset
 		usb_new_address = 0;
 		usb_address = 0;
 #ifdef	USBTINY_USB_OK_LED
 		CLR(USBTINY_USB_OK_LED);	// LED off
+#endif
+#if USBTINY_USB_STATUS_API
+		is_connected = 0;
 #endif
 	}
 }
@@ -480,5 +534,29 @@ extern	byte_t	usb_load_endp1(byte_t* data, byte_t len)
 	
 	return i;
 }
+
+#endif
+
+#if USBTINY_USB_STATUS_API
+
+extern	byte_t	usb_connected() {
+	return is_connected;
+}
+
+extern	byte_t	usb_idle() {
+	return (usb_tx_state == TX_STATE_IDLE) && (usb_rx_len == 0);
+}
+
+#ifdef	USBTINY_DMINUS_PULLUP
+void usb_disable_pulldown() {
+	INPUT(USBTINY_DMINUS_PULLUP);	// disable pullup on D-
+	CLR(USBTINY_DMINUS_PULLUP);
+}
+
+void usb_enable_pulldown() {
+	SET(USBTINY_DMINUS_PULLUP);
+	OUTPUT(USBTINY_DMINUS_PULLUP);	// enable pullup on D-
+}
+#endif
 
 #endif

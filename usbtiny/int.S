@@ -43,7 +43,7 @@
 ; Modified by Edward Holets, 2010.
 ; Added support for a single additional end point at the cost of 8
 ; cycles at the end of the interrupt handler. This brings the total
-; free cycles between interrupts to 20. Not including the I-bit caveat
+; free cycles between interrupts to 25. Not including the I-bit caveat
 ; mentioned by Dick Streefland above.
 ;
 ;
@@ -326,8 +326,8 @@ eop2:
 ;	ldd	addr, Y+1
 ;	andi	addr, 0x7f
 ; ADDED - Edward Holets 9/9/2010 - we use one cycle here
-	ldd	tmp2, Y+1
-	mov addr, tmp2
+	ldd	addr, Y+1
+	bst addr, 7 		; grab LSB of ENDP and place in T - 1 cycle
 	andi	addr, 0x7f
 ; END ADDED
 	lds	tmp, usb_address
@@ -342,9 +342,8 @@ eop2:
 ; ----------------------------------------------------------------------
 
 ; ADDED - Edward Holets 9/9/2010
-; we have 4 cycles - 3 used here, 1 used above
-	bst tmp2, 7 		; grab LSB of ENDP and place in T - 1 cycle
-	brbc 6, endpoint0	; branch if the endpoint is #0 - 1/2 cycles
+; we have 4 cycles - 2 used here, 1 used above
+	brtc endpoint0		; branch if the endpoint is #0 - 1/2 cycles
 	nop					; keep endpoint1 call path in sync with endpoint0 - 1 cycle
 ; endpoint 1
 	lds	count, usb_tx1_len
@@ -604,13 +603,10 @@ gen_eop:
 	out	USB_DDR, usbmask	; release bus
 	out	USB_OUT, count		; disable D- pullup
 	pop	usbmask
-	pop	count
-
 ; ADDED - Edward Holets 9/8/2010 ; code moved from above
-	push tmp
-	lds	tmp, usb_new_address
-	sts	usb_address, tmp	; assign new address at end of transfer
-	pop tmp
-; END ADD	
+	lds	count, usb_new_address
+	sts	usb_address, count	; assign new address at end of transfer
+; END ADD
+	pop	count
 	
 	reti

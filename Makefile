@@ -7,7 +7,7 @@
 # Public License as published by the Free Software Foundation.
 # ======================================================================
 
-DIR	= spi ir usbtinyisp template util tinytest tinytest-861 keyboard-spoof
+DIR	= spi ir usbtinyisp template util tinytest tinytest-861 keyboard-spoof dow-clock
 
 all clean clobber:
 	@for i in $(DIR); do $(MAKE) $(MFLAGS) -C $$i $@; done
