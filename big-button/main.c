@@ -16,6 +16,7 @@
 #include "stddef.h"
 
 #define RELAY_DURATION_NOT_SET -1
+#define LED_DURATION_NOT_SET -1
 
 // HID Class Globals
 typedef unsigned int counter_t;
@@ -23,10 +24,12 @@ byte_t keys[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 counter_t ms_counter = 0;
 counter_t idle_counter = 0;
 counter_t relay_counter = 0;
+counter_t led_counter = 0;
 byte_t idle_rate = 125;
 byte_t keys_changed = 0;
 byte_t button_press_running = 0;
 int relay_duration = RELAY_DURATION_NOT_SET;
+int led_duration = LED_DURATION_NOT_SET;
 
 const byte_t	report_desc [USBTINY_HID_REPORT_DESCRIPTOR_LENGTH] PROGMEM = {
 	0x05, 0x01, // Usage Page (Generic Desktop)
@@ -134,6 +137,23 @@ extern	byte_t	usb_setup ( byte_t data[8] )
 					break;
 			}
 			break;
+		case 0x0D: // CONTROL LED
+			switch (data[2]) {
+				case 0x00: // off
+					PORT_CLR(BUTTON_LED_PORT, BUTTON_LED_PIN);
+					DDR_CLR(BUTTON_LED_PORT, BUTTON_LED_PIN);
+					break;
+				case 0x01: // on
+					DDR_SET(BUTTON_LED_PORT, BUTTON_LED_PIN);
+					PORT_SET(BUTTON_LED_PORT, BUTTON_LED_PIN);
+					break;
+				case 0x02: // self timed
+					DDR_SET(BUTTON_LED_PORT, BUTTON_LED_PIN);
+					PORT_SET(BUTTON_LED_PORT, BUTTON_LED_PIN);
+					led_duration = data[4] + (data[5] << 8); // duration in ms 
+					break;
+			}
+			break;
 		default:
 			break;
 	}
@@ -181,6 +201,7 @@ void timer0_poll( void ) {
 		ms_counter++;
 		idle_counter++;
 		relay_counter++;
+		led_counter++;
 	}
 }
 
@@ -199,8 +220,6 @@ void button_init() {
 
 void button_stop() {
 	button_press_running = 0;
-	PORT_CLR(BUTTON_LED_PORT, BUTTON_LED_PIN);
-	DDR_CLR(BUTTON_LED_PORT, BUTTON_LED_PIN);
 }
 
 void button_poll() {
@@ -209,9 +228,18 @@ void button_poll() {
 		if (!button_press_running)
 		{
 			button_press_running = 1;
-			DDR_SET(BUTTON_LED_PORT, BUTTON_LED_PIN);
-			PORT_SET(BUTTON_LED_PORT, BUTTON_LED_PIN);
 		}
+	}
+	if (led_duration != LED_DURATION_NOT_SET)
+	{
+		if (led_counter >= led_duration)
+		{
+			PORT_CLR(BUTTON_LED_PORT, BUTTON_LED_PIN);
+			DDR_CLR(BUTTON_LED_PORT, BUTTON_LED_PIN);
+			led_duration = LED_DURATION_NOT_SET;
+		}
+	} else {
+		led_counter = 0;
 	}
 }
 
